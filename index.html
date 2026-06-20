@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff007f'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0911" />
+    
+    <!-- SEO and Meta tags -->
+    <title>JeffPlay - Nikmati Musik Secara Online & Offline</title>
+    <meta name="description" content="JeffPlay adalah aplikasi streaming musik online premium yang memungkinkan Anda men-download lagu ke browser untuk diputar secara offline kapan saja." />
+    
+    <!-- PWA integration -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff007f'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z'/%3E%3C/svg%3E" />
+
+    <!-- Style configuration -->
+    <link rel="stylesheet" href="/src/style.css" />
+    
+    <!-- YouTube Iframe Player API for premium online streaming -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+  </head>
+  <body>
+    <!-- Ambient glowing backgrounds -->
+    <div class="ambient-bg">
+      <div id="ambient-glow-1" class="ambient-glow"></div>
+      <div class="ambient-glow-2"></div>
+    </div>
+
+    <div class="app-container">
+      <!-- Sidebar Navigation (Desktop) -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-logo">
+            <!-- Play icon inside rounded logo -->
+            <svg viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+          <span class="brand-name">JeffPlay</span>
+        </div>
+
+        <nav class="nav-group">
+          <h3 class="nav-title">Menu Utama</h3>
+          <ul class="nav-menu">
+            <li class="nav-item active" data-view="home">
+              <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+              <span>Beranda</span>
+            </li>
+            <li class="nav-item" data-view="favorites">
+              <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span>Favorit Saya</span>
+            </li>
+            <li class="nav-item" data-view="playlists">
+              <svg viewBox="0 0 24 24"><path d="M19 8H5v2h14V8zm0 6H5v2h14v-2zM5 18h14v2H5v-2zM5 4v2h14V4H5z"/></svg>
+              <span>Daftar Putar</span>
+            </li>
+            <li class="nav-item" data-view="library">
+              <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 10H6v-2h12v2zm0-4H6v-2h12v2z"/></svg>
+              <span>Lagu Saya / Offline</span>
+            </li>
+          </ul>
+        </nav>
+
+        <!-- Dynamic Storage quota estimation in sidebar footer -->
+        <div class="sidebar-footer">
+          <div class="storage-title">
+            <span>Penyimpanan Offline</span>
+            <span id="storage-percentage">0%</span>
+          </div>
+          <div class="storage-bar-container">
+            <div id="storage-bar" class="storage-bar"></div>
+          </div>
+          <div id="storage-details" class="storage-details">Menghitung...</div>
+        </div>
+      </aside>
+
+      <!-- Main Panel viewport -->
+      <main class="main-content">
+        <!-- Top header containing Search and offline modes -->
+        <header class="top-header">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" id="search-bar" class="search-input" placeholder="Cari judul lagu atau nama penyanyi..." />
+          </div>
+
+          <div class="header-actions">
+            <!-- Offline Switch Toggle -->
+            <div class="offline-toggle-container">
+              <span class="offline-label">Mode Offline</span>
+              <label class="switch">
+                <input type="checkbox" id="offline-mode-switch" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <!-- PWA install button -->
+            <button id="pwa-install-btn" class="btn-primary" style="display: none; padding: 8px 16px; font-size: 13px;">
+              Pasang Aplikasi
+            </button>
+          </div>
+        </header>
+
+        <!-- VIEW: Home (Online Streaming Catalog) -->
+        <section id="view-home" class="view-panel active-view">
+          <!-- Hero Banner Section -->
+          <div class="hero-banner" style="background: linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.15) 0%, rgba(10, 9, 17, 0.4) 100%); border: 1px solid var(--border-light); border-radius: 24px; padding: 30px 40px; margin-bottom: 25px; display: flex; align-items: center; gap: 30px; justify-content: space-between; overflow: hidden; position: relative;">
+            <div style="z-index: 2;">
+              <span class="hero-tag" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--accent-color); letter-spacing: 1px; text-transform: uppercase;">Pilihan Editor</span>
+              <h1 class="hero-title" style="font-size: 32px; font-weight: 800; margin-top: 12px; margin-bottom: 8px; letter-spacing: -1px; line-height: 1.1;">JeffPlay Premium</h1>
+              <p class="hero-subtitle" style="font-size: 14px; color: var(--text-secondary); max-width: 450px; margin-bottom: 20px; line-height: 1.5;">Dengarkan ribuan lagu secara online atau simpan lagu offline langsung ke browsermu tanpa biaya.</p>
+              <button id="hero-play-random-btn" class="btn-primary" style="display: inline-flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.44l2.04 2.04V4h-5.5zm.38 9.08l-1.42 1.42 3.9 3.9L14.5 20h5.5v-5.5l-2.04 2.04-3.88-3.9z"/></svg>
+                Putar Acak
+              </button>
+            </div>
+            <!-- Decorative visual element -->
+            <div class="hero-visual" style="width: 150px; height: 150px; background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%); border-radius: 50%; opacity: 0.3; filter: blur(20px); pointer-events: none; position: absolute; right: 20px; top: 10px;"></div>
+          </div>
+
+          <!-- Pills Filter Section (ArchiveTune Style) -->
+          <div class="pills-container" id="genre-pills-container">
+            <button class="pill-btn active" data-genre="all">Semua</button>
+            <button class="pill-btn" data-genre="Lofi">Relax</button>
+            <button class="pill-btn" data-genre="Synthwave">Energize</button>
+            <button class="pill-btn" data-genre="Ambient">Sleep</button>
+            <button class="pill-btn" data-genre="Electronic">Feel good</button>
+            <button class="pill-btn" data-genre="Acoustic">Acoustic</button>
+          </div>
+
+          <!-- Category Playlists Section (Online Hits) -->
+          <div class="home-section-container" style="margin-bottom: 35px;">
+            <h2 class="category-title" style="font-size: 20px; font-weight: 800; margin-bottom: 16px; color: #fff; letter-spacing: -0.3px;">Kategori Musik Terpopuler (Audius Hits)</h2>
+            <div class="playlists-grid" id="category-playlists-container">
+              <!-- Category cards injected dynamically -->
+            </div>
+          </div>
+
+          <!-- Curated Songs Grid Section -->
+          <div class="home-section-container">
+            <h2 class="category-title" style="font-size: 20px; font-weight: 800; margin-bottom: 16px; color: #fff; letter-spacing: -0.3px;">Rekomendasi Lagu Hits (Audius)</h2>
+            <div class="songs-grid" id="curated-songs-list">
+              <!-- Song cards injected dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: Search Results -->
+        <section id="view-search" class="view-panel">
+          <h1 class="section-title">Hasil Pencarian</h1>
+          
+          <div id="local-results-section" style="margin-bottom: 30px; display: none;">
+            <h2 class="section-title" style="font-size: 18px; margin-bottom: 12px; color: var(--accent-color);">Lagu Terkait</h2>
+            <div class="song-list-container" id="local-search-results"></div>
+          </div>
+          
+          <!-- YouTube Results Section -->
+          <div id="youtube-results-section" style="margin-bottom: 30px;">
+            <h2 class="section-title" style="font-size: 18px; margin-bottom: 12px; color: var(--accent-color);">Lagu Online (YouTube Music Hits)</h2>
+            <div id="youtube-search-loading" class="empty-state" style="padding: 20px; display: none;">
+              <div class="spinner" style="border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--accent-color); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-bottom: 10px;"></div>
+              <p>Mencari lagu di YouTube Music...</p>
+            </div>
+            <div class="song-list-container" id="youtube-search-results"></div>
+          </div>
+          
+          <div id="online-results-section">
+            <h2 class="section-title" style="font-size: 18px; margin-bottom: 12px; color: var(--accent-color);">Lagu Bebas Hak Cipta (Audius Open Source)</h2>
+            <div id="online-search-loading" class="empty-state" style="padding: 20px; display: none;">
+              <div class="spinner" style="border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--accent-color); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin-bottom: 10px;"></div>
+              <p>Mencari lagu di server...</p>
+            </div>
+            <div class="song-list-container" id="online-search-results"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: Favorites -->
+        <section id="view-favorites" class="view-panel">
+          <h1 class="section-title">Lagu Favorit</h1>
+          <div class="song-list-container" id="favorites-list-container">
+            <!-- List rows will be populated dynamically -->
+          </div>
+        </section>
+
+        <!-- VIEW: Playlists -->
+        <section id="view-playlists" class="view-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h1 class="section-title" style="margin-bottom: 0;">Daftar Putar Anda</h1>
+            <button id="create-playlist-btn" class="btn-primary">+ Buat Baru</button>
+          </div>
+          
+          <div class="playlists-grid" id="playlists-list-container">
+            <!-- Playlists items populated here -->
+          </div>
+        </section>
+
+        <!-- VIEW: Playlist Details (Shows songs inside a single playlist) -->
+        <section id="view-playlist-details" class="view-panel">
+          <div class="playlist-header-card">
+            <div class="playlist-cover-art">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+            </div>
+            <div class="playlist-meta">
+              <span class="playlist-tag">Daftar Putar</span>
+              <h1 class="playlist-title-large" id="selected-playlist-name">Judul Playlist</h1>
+              <span class="playlist-song-count" id="selected-playlist-count">0 Lagu</span>
+            </div>
+          </div>
+          
+          <div class="song-list-container" id="playlist-songs-container">
+            <!-- Songs of the current playlist -->
+          </div>
+        </section>
+
+        <!-- VIEW: Library (Custom uploads / downloads) -->
+        <section id="view-library" class="view-panel">
+          <h1 class="section-title">Library Musik</h1>
+
+          <!-- Drag and drop import zone -->
+          <div class="upload-zone" id="drag-drop-zone">
+            <input type="file" id="file-upload-input" accept="audio/*" style="display: none;" multiple />
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <span class="upload-title">Impor Lagu Lokal Baru</span>
+            <span class="upload-subtitle">Tarik & lepas file audio (MP3, WAV, dsb.) di sini atau klik untuk memilih file</span>
+          </div>
+
+          <!-- URL import zone -->
+          <div class="url-import-zone" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-light); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 30px;">
+            <!-- Row 1: Link Icon + Input Field + Paste Button (integrated inside single wrapper) -->
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.25); border: 1px solid var(--border-light); border-radius: 12px; padding: 6px 12px; width: 100%; box-sizing: border-box;">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: var(--text-secondary); stroke-width: 2; fill: none; flex-shrink: 0;"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+              <input type="text" id="url-upload-input" class="search-input" style="flex: 1; min-width: 0; margin-left: 0; background: transparent; border: none; outline: none; padding: 8px 6px;" placeholder="Masukkan URL audio streaming atau video/music YouTube..." />
+              <button id="btn-paste-url" class="btn-secondary" style="flex-shrink: 0; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; height: 32px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06);">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor;"><path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/></svg>
+                Tempel
+              </button>
+            </div>
+            <!-- Row 2: Add Button (Full width) -->
+            <button id="btn-import-url" class="btn-primary" style="width: 100%; border-radius: 12px; padding: 12px 24px; font-size: 14px; display: flex; align-items: center; justify-content: center;">Tambah Lagu</button>
+          </div>
+
+          <div style="margin-top: 40px;">
+            <h2 class="section-title" style="font-size: 20px; margin-bottom: 16px;">Semua Lagu Offline Anda</h2>
+            <div class="song-list-container" id="library-songs-container">
+              <!-- Custom tracks & downloaded tracks appear here -->
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Bottom Player Bar (Music controls) -->
+      <footer id="player-bar" class="player-bar">
+        <!-- Left: Track info -->
+        <div class="player-track-info">
+          <img id="player-track-cover" class="player-cover" src="/default_cover.png" alt="Cover Art" />
+          <div class="player-text">
+            <span id="player-track-title" class="player-title">Tidak sedang memutar</span>
+            <span id="player-track-artist" class="player-artist">Pilih lagu untuk memulai</span>
+          </div>
+          <div class="player-track-actions">
+            <!-- Favorite button -->
+            <button id="player-fav-btn" class="row-btn" style="color: var(--text-muted);">
+              <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </button>
+            <!-- Add to playlist button -->
+            <button id="player-playlist-btn" class="row-btn" style="color: var(--text-muted);">
+              <svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Center: Control button actions & seekbar -->
+        <div class="player-controls-container">
+          <div class="control-buttons">
+            <!-- Shuffle -->
+            <button id="player-shuffle-btn" class="control-btn" title="Acak">
+              <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.44l2.04 2.04V4h-5.5zm.38 9.08l-1.42 1.42 3.9 3.9L14.5 20h5.5v-5.5l-2.04 2.04-3.88-3.9z"/></svg>
+            </button>
+            <!-- Prev -->
+            <button id="player-prev-btn" class="control-btn" title="Sebelumnya">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <!-- Play/Pause -->
+            <button id="player-play-pause-btn" class="control-btn play-pause-btn" title="Putar">
+              <!-- Play icon path by default -->
+              <svg id="play-pause-svg-icon" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+            <!-- Next -->
+            <button id="player-next-btn" class="control-btn" title="Berikutnya">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
+            </button>
+            <!-- Repeat -->
+            <button id="player-repeat-btn" class="control-btn" title="Ulang">
+              <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+            </button>
+          </div>
+
+          <!-- Progress slider bar -->
+          <div class="player-progress-bar">
+            <span id="player-current-time" class="time-stamp">0:00</span>
+            <div id="player-progress-container" class="slider-container">
+              <div class="slider-track">
+                <div id="player-progress-fill" class="slider-fill"></div>
+              </div>
+              <div id="player-progress-thumb" class="slider-thumb" style="left: 0%;"></div>
+            </div>
+            <span id="player-total-time" class="time-stamp">0:00</span>
+          </div>
+        </div>
+
+        <!-- Right: Volume controller -->
+        <div class="player-volume-actions">
+          <div class="volume-container">
+            <button id="player-volume-btn" class="row-btn" style="padding: 0; color: var(--text-secondary);">
+              <svg id="volume-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </button>
+            <div id="player-volume-container" class="slider-container">
+              <div class="slider-track">
+                <div id="player-volume-fill" class="slider-fill" style="width: 80%;"></div>
+              </div>
+              <div id="player-volume-thumb" class="slider-thumb" style="left: 80%;"></div>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- MODAL: Buat Playlist Baru -->
+    <div id="modal-create-playlist" class="modal-overlay">
+      <div class="modal-content">
+        <h2 class="modal-title">Buat Daftar Putar Baru</h2>
+        <input type="text" id="playlist-name-input" class="modal-input" placeholder="Masukkan nama daftar putar..." maxlength="30" />
+        <div class="modal-actions">
+          <button id="btn-cancel-create-playlist" class="btn-secondary">Batal</button>
+          <button id="btn-confirm-create-playlist" class="btn-primary">Buat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Pilih Playlist (Menambahkan lagu) -->
+    <div id="modal-select-playlist" class="modal-overlay">
+      <div class="modal-content">
+        <h2 class="modal-title">Tambahkan ke Daftar Putar</h2>
+        <div class="playlist-select-list" id="playlist-selector-list-items">
+          <!-- Playlists selection item populated dynamically -->
+        </div>
+        <div class="modal-actions" style="margin-top: 10px;">
+          <button id="btn-close-select-playlist" class="btn-secondary">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Edit detail lagu custom yang di-upload -->
+    <div id="modal-edit-custom-track" class="modal-overlay">
+      <div class="modal-content">
+        <h2 class="modal-title">Edit Info Lagu</h2>
+        
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Judul Lagu</label>
+        <input type="text" id="custom-track-title-input" class="modal-input" style="margin-bottom: 16px;" placeholder="Contoh: Cinta Luar Biasa" />
+        
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Penyanyi / Artis</label>
+        <input type="text" id="custom-track-artist-input" class="modal-input" style="margin-bottom: 16px;" placeholder="Contoh: Andmesh" />
+
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Album (Opsional)</label>
+        <input type="text" id="custom-track-album-input" class="modal-input" style="margin-bottom: 24px;" placeholder="Contoh: Solo Album" />
+
+        <div class="modal-actions">
+          <button id="btn-cancel-custom-track" class="btn-secondary">Batal</button>
+          <button id="btn-confirm-custom-track" class="btn-primary">Simpan Lagu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications center -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-nav">
+      <div class="nav-item active" data-view="home">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span>Beranda</span>
+      </div>
+      <div class="nav-item" data-view="favorites">
+        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span>Favorit</span>
+      </div>
+      <div class="nav-item" data-view="playlists">
+        <svg viewBox="0 0 24 24"><path d="M19 8H5v2h14V8zm0 6H5v2h14v-2zM5 18h14v2H5v-2zM5 4v2h14V4H5z"/></svg>
+        <span>Playlist</span>
+      </div>
+      <div class="nav-item" data-view="library">
+        <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 10H6v-2h12v2zm0-4H6v-2h12v2z"/></svg>
+        <span>Library</span>
+      </div>
+    </nav>
+
+    <!-- Hidden YouTube Iframe Player container (off-screen) -->
+    <div id="yt-player" style="position: absolute; top: -1000px; left: -1000px; width: 200px; height: 200px; opacity: 0; pointer-events: none; z-index: -9999;"></div>
+
+    <!-- Application bootstrap -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

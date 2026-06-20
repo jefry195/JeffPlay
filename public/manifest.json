@@ -1,0 +1,18 @@
+{
+  "name": "JeffPlay Music Player",
+  "short_name": "JeffPlay",
+  "description": "JeffPlay adalah aplikasi streaming musik online premium dengan dukungan pemutaran offline menggunakan penyimpanan browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0911",
+  "theme_color": "#0a0911",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff007f'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z'/%3E%3C/svg%3E",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
