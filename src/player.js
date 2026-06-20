@@ -449,6 +449,14 @@ class AudioPlayer {
     }
   }
 
+  togglePlay() {
+    if (this.isPlaying) {
+      this.pause();
+    } else {
+      this.play();
+    }
+  }
+
   toggleShuffle() {
     this.shuffleMode = !this.shuffleMode;
     this.notify('shuffletoggle', this.shuffleMode);
@@ -472,6 +480,14 @@ class AudioPlayer {
       return this.queue[this.currentIndex];
     }
     return null;
+  }
+
+  getQueue() {
+    return this.queue;
+  }
+
+  getCurrentIndex() {
+    return this.currentIndex;
   }
 }
 

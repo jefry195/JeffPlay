@@ -12,6 +12,17 @@ let selectedTrackForPlaylist = null;
 let pendingCustomFile = null;
 let trendingTracks = [];
 
+// Cache for online (YouTube/Audius) tracks so they can appear in Favorites
+// Key: track.id, Value: track object
+let onlineTracksCache = {};
+
+function cacheOnlineTrack(track) {
+  if (!track || !track.id) return;
+  if (track.source === 'youtube' || track.source === 'audius') {
+    onlineTracksCache[track.id] = track;
+  }
+}
+
 // DOM Elements
 const sidebarItems = document.querySelectorAll('.nav-item');
 const viewPanels = document.querySelectorAll('.view-panel');
@@ -617,10 +628,23 @@ function renderPopularArtists() {
 function renderFavoritesView() {
   favoritesListContainer.innerHTML = '';
 
-  const favoriteTracks = [
+  // Include: curated, custom offline, AND any online (YouTube/Audius) tracks ever played/favorited
+  const cachedOnline = Object.values(onlineTracksCache);
+  const allKnownTracks = [
     ...CURATED_TRACKS,
-    ...offlineTracks.filter(ot => ot.source === 'custom')
-  ].filter(t => favoriteTrackIds.includes(t.id));
+    ...offlineTracks.filter(ot => ot.source === 'custom'),
+    ...cachedOnline
+  ];
+
+  // Deduplicate by id
+  const seen = new Set();
+  const uniqueTracks = allKnownTracks.filter(t => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+
+  const favoriteTracks = uniqueTracks.filter(t => favoriteTrackIds.includes(t.id));
 
   // Filter if in offline mode
   const filtered = favoriteTracks.filter(track => {
@@ -737,6 +761,7 @@ function renderTrackList(container, tracksList) {
     row.addEventListener('click', (e) => {
       // Don't play if clicked on buttons
       if (e.target.closest('.row-btn')) return;
+      cacheOnlineTrack(track); // cache for favorites
       const playQueue = container.id === 'youtube-search-results' ? currentSearchYouTubeTracks : tracksList;
       playTrack(track, playQueue);
     });
@@ -744,6 +769,7 @@ function renderTrackList(container, tracksList) {
     // Favorite Button Handler
     row.querySelector('.fav-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
+      cacheOnlineTrack(track); // ensure online track is cached before favoriting
       const active = await storage.toggleFavorite(track.id);
       favoriteTrackIds = await storage.getFavorites();
       
@@ -1232,18 +1258,20 @@ async function playTrack(track, queue) {
 function handleTrackChange(track) {
   if (!track) return;
 
+  // Cache online track so it can be used in favorites later
+  cacheOnlineTrack(track);
+
   // Update cover and text
   const isCustom = track.source === 'custom';
+  let coverSrc = '/default_cover.png';
   
-  // For custom tracks, resolve the coverBlob object URL if it exists
   if (track.coverBlob) {
-    playerTrackCover.src = URL.createObjectURL(track.coverBlob);
-  } else if (isCustom) {
-    playerTrackCover.src = '/default_cover.png';
-  } else {
-    playerTrackCover.src = track.coverUrl;
+    coverSrc = URL.createObjectURL(track.coverBlob);
+  } else if (!isCustom && track.coverUrl) {
+    coverSrc = track.coverUrl;
   }
 
+  playerTrackCover.src = coverSrc;
   playerTrackTitle.textContent = track.title;
   playerTrackArtist.textContent = track.artist;
 
@@ -1267,6 +1295,37 @@ function handleTrackChange(track) {
       row.classList.remove('active-row');
     }
   });
+
+  // ── Media Session API (background/lock screen controls) ──
+  if ('mediaSession' in navigator) {
+    const artwork = coverSrc && coverSrc !== '/default_cover.png'
+      ? [{ src: coverSrc, sizes: '512x512', type: 'image/jpeg' }]
+      : [];
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || 'JeffPlay',
+      artist: track.artist || '',
+      album: track.album || 'JeffPlay',
+      artwork
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      player.togglePlay();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      player.togglePlay();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      player.previous();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      player.next();
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined) {
+        player.seek(details.seekTime);
+      }
+    });
+  }
 }
 
 function handlePlayStateChange({ isPlaying }) {
@@ -1283,6 +1342,11 @@ function handlePlayStateChange({ isPlaying }) {
     `;
     playerPlayPauseBtn.title = 'Putar';
   }
+
+  // Sync Media Session playback state
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }
 }
 
 function handleTimeUpdate({ currentTime, duration, percentage }) {
@@ -1292,7 +1356,19 @@ function handleTimeUpdate({ currentTime, duration, percentage }) {
   // Update slider fill and thumb position
   playerProgressFill.style.width = `${percentage}%`;
   playerProgressThumb.style.left = `${percentage}%`;
+
+  // Sync lock screen progress bar
+  if ('mediaSession' in navigator && duration > 0) {
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: duration,
+        playbackRate: 1,
+        position: Math.min(currentTime, duration)
+      });
+    } catch (e) { /* ignore if not supported */ }
+  }
 }
+
 
 function handleVolumeChange(volume) {
   updateVolumeUI(volume);
