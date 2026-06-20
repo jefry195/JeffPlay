@@ -12,33 +12,48 @@ const YT_DLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt
 function downloadYtDlp() {
   return new Promise((resolve, reject) => {
     if (existsSync(TMP_BIN)) return resolve(TMP_BIN);
-    const file = fs.createWriteStream(TMP_BIN);
-    https.get(YT_DLP_URL, (res) => {
-      const follow = (r) => {
-        r.pipe(file);
-        file.on('finish', () => { file.close(); try { chmodSync(TMP_BIN, '755'); } catch(e){} resolve(TMP_BIN); });
-      };
-      if ([301, 302].includes(res.statusCode)) {
-        https.get(res.headers.location, follow).on('error', reject);
-      } else { follow(res); }
-    }).on('error', reject);
+    const tmp = TMP_BIN + '.part';
+    const file = fs.createWriteStream(tmp);
+    function follow(url, depth = 0) {
+      if (depth > 5) return reject(new Error('Too many redirects'));
+      https.get(url, { timeout: 20000 }, (res) => {
+        if ([301, 302, 307].includes(res.statusCode) && res.headers.location) {
+          res.resume();
+          return follow(res.headers.location, depth + 1);
+        }
+        res.pipe(file);
+        file.on('finish', () => {
+          file.close(() => {
+            try { fs.renameSync(tmp, TMP_BIN); chmodSync(TMP_BIN, '755'); } catch (e) {}
+            resolve(TMP_BIN);
+          });
+        });
+        res.on('error', reject);
+      }).on('error', reject);
+    }
+    follow(YT_DLP_URL);
   });
 }
 
 async function ensureBin() {
-  if (process.platform === 'win32' && existsSync(LOCAL_BIN)) return LOCAL_BIN;
+  if (existsSync(LOCAL_BIN)) return LOCAL_BIN;
   if (existsSync(TMP_BIN)) return TMP_BIN;
-  return await downloadYtDlp();
+  return await Promise.race([
+    downloadYtDlp(),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), 25000))
+  ]);
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const { id } = req.query;
   if (!id) { res.status(400).json({ error: 'Missing id' }); return; }
 
   try {
     const binPath = await ensureBin();
-    exec(`"${binPath}" --no-warnings -g -f "ba" "https://www.youtube.com/watch?v=${id}"`,
-      { maxBuffer: 1 * 1024 * 1024, timeout: 25000 },
+    exec(
+      `"${binPath}" --no-warnings -g -f "ba" "https://www.youtube.com/watch?v=${id}"`,
+      { maxBuffer: 1 * 1024 * 1024, timeout: 28000 },
       (err, stdout) => {
         if (err) { res.status(500).json({ error: err.message }); return; }
         const url = stdout.trim();
@@ -46,6 +61,6 @@ export default async function handler(req, res) {
       }
     );
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(503).json({ error: 'yt-dlp unavailable: ' + err.message });
   }
 }
