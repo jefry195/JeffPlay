@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/yt-search.js": { "maxDuration": 30 },
+    "api/yt-info.js":   { "maxDuration": 30 },
+    "api/yt-download.js": { "maxDuration": 30 },
+    "api/proxy-api.js": { "maxDuration": 15 }
+  },
+  "rewrites": [
+    { "source": "/api/yt-search",  "destination": "/api/yt-search"  },
+    { "source": "/api/yt-info",    "destination": "/api/yt-info"    },
+    { "source": "/api/yt-download","destination": "/api/yt-download" },
+    { "source": "/api/proxy-api",  "destination": "/api/proxy-api"  },
+    { "source": "/(.*)",           "destination": "/index.html"      }
+  ]
+}
