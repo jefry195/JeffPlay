@@ -2784,11 +2784,17 @@ async function triggerGlobalSearch(query) {
   const onlineLoading = document.getElementById('online-search-loading');
   const onlineContainer = document.getElementById('online-search-results');
 
+  const playlistSection  = document.getElementById('playlist-results-section');
+  const playlistLoading  = document.getElementById('playlist-search-loading');
+  const playlistContainer = document.getElementById('playlist-search-results');
+
   youtubeContainer.innerHTML = '';
   onlineContainer.innerHTML = '';
+  if (playlistContainer) playlistContainer.innerHTML = '';
 
   if (isOfflineMode) {
     if (youtubeSection) youtubeSection.style.display = 'none';
+    if (playlistSection) playlistSection.style.display = 'none';
     onlineContainer.innerHTML = `
       <div class="empty-state" style="padding: 20px;">
         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z"/></svg>
@@ -2803,7 +2809,24 @@ async function triggerGlobalSearch(query) {
     youtubeSection.style.display = 'block';
     youtubeLoading.style.display = 'flex';
   }
+  if (playlistSection) {
+    playlistSection.style.display = 'block';
+    playlistLoading.style.display = 'flex';
+  }
   onlineLoading.style.display = 'flex';
+
+  // 2b. Search YouTube Playlists in parallel
+  searchYouTubePlaylists(query).then(playlists => {
+    if (playlistLoading) playlistLoading.style.display = 'none';
+    if (!playlists || playlists.length === 0) {
+      if (playlistSection) playlistSection.style.display = 'none';
+      return;
+    }
+    renderPlaylistCards(playlistContainer, playlists);
+  }).catch(() => {
+    if (playlistLoading) playlistLoading.style.display = 'none';
+    if (playlistSection) playlistSection.style.display = 'none';
+  });
 
   // 2. Search online YouTube Music via Invidious API
   searchYouTubeInvidious(query, 1).then(data => {
@@ -2898,6 +2921,238 @@ async function triggerGlobalSearch(query) {
         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z"/></svg>
         <h3>Pencarian Audius Gagal</h3>
         <p>Gagal memuat hasil pencarian dari Audius (masalah koneksi server atau CORS).</p>
+      </div>
+    `;
+  });
+}
+
+// ── YouTube Playlist Search & Track Loading ──────────────────────────────────
+
+async function searchYouTubePlaylists(query) {
+  // Try local yt-dlp endpoint first
+  try {
+    const res = await fetch(`/api/yt-playlist-search?q=${encodeURIComponent(query)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    console.warn('Local playlist search failed, trying Invidious...', e);
+  }
+
+  // Fallback: Invidious search with type=playlist
+  try {
+    const instances = await loadInvidiousInstances();
+    const shuffled = [...instances].sort(() => 0.5 - Math.random()).slice(0, 4);
+    for (const instance of shuffled) {
+      try {
+        const targetUrl = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=playlist&page=1`;
+        const proxyUrl = `/proxy-api?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            return data.map(p => ({
+              playlistId: p.playlistId,
+              title: p.title,
+              channel: p.author || 'YouTube',
+              videoCount: p.videoCount || null,
+              thumbnailUrl: (p.playlistThumbnail || (p.videos && p.videos[0] && `https://img.youtube.com/vi/${p.videos[0].videoId}/hqdefault.jpg`) || '/default_cover.png')
+            }));
+          }
+        }
+      } catch (e) { /* try next */ }
+    }
+  } catch (e) {
+    console.warn('Invidious playlist search failed', e);
+  }
+
+  return [];
+}
+
+function renderPlaylistCards(container, playlists) {
+  container.innerHTML = '';
+  playlists.forEach(pl => {
+    const card = document.createElement('div');
+    card.className = 'yt-playlist-card';
+    card.innerHTML = `
+      <div class="yt-playlist-card-thumb">
+        <img src="${pl.thumbnailUrl}" alt="${pl.title}" loading="lazy" onerror="this.src='/default_cover.png'" />
+        <div class="yt-playlist-card-overlay">
+          <div class="yt-playlist-card-play-icon">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+        ${pl.videoCount ? `<span class="yt-playlist-card-badge">▶ ${pl.videoCount} lagu</span>` : ''}
+      </div>
+      <div class="yt-playlist-card-body">
+        <div class="yt-playlist-card-title">${pl.title}</div>
+        <div class="yt-playlist-card-meta">${pl.channel}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => openPlaylistTracksModal(pl));
+    container.appendChild(card);
+  });
+}
+
+async function loadPlaylistTracks(playlistId) {
+  // Try local yt-dlp endpoint first
+  try {
+    const res = await fetch(`/api/yt-playlist?id=${encodeURIComponent(playlistId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    console.warn('Local playlist fetch failed, trying Invidious...', e);
+  }
+
+  // Fallback: Invidious playlist API
+  try {
+    const instances = await loadInvidiousInstances();
+    const shuffled = [...instances].sort(() => 0.5 - Math.random()).slice(0, 4);
+    for (const instance of shuffled) {
+      try {
+        const targetUrl = `${instance}/api/v1/playlists/${playlistId}?fields=videos`;
+        const proxyUrl = `/proxy-api?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.videos && data.videos.length > 0) {
+            return data.videos.map(v => ({
+              videoId: v.videoId,
+              title: v.title,
+              author: v.author || 'YouTube',
+              lengthSeconds: v.lengthSeconds || 0
+            }));
+          }
+        }
+      } catch (e) { /* try next */ }
+    }
+  } catch (e) {
+    console.warn('Invidious playlist tracks fetch failed', e);
+  }
+
+  throw new Error('Tidak dapat memuat lagu dari playlist ini.');
+}
+
+function openPlaylistTracksModal(playlist) {
+  // Remove any existing modal
+  const existing = document.getElementById('yt-playlist-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'yt-playlist-modal';
+  modal.className = 'playlist-tracks-modal';
+  modal.innerHTML = `
+    <div class="playlist-tracks-sheet">
+      <div class="playlist-tracks-sheet-header">
+        <img class="playlist-tracks-sheet-cover" src="${playlist.thumbnailUrl}" alt="${playlist.title}" onerror="this.src='/default_cover.png'" />
+        <div class="playlist-tracks-sheet-info">
+          <h3>${playlist.title}</h3>
+          <p>${playlist.channel}${playlist.videoCount ? ` · ${playlist.videoCount} lagu` : ''}</p>
+        </div>
+        <button class="playlist-tracks-sheet-close" id="playlist-modal-close-btn">
+          <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div class="playlist-tracks-sheet-actions">
+        <button class="btn-primary" id="playlist-play-all-btn" style="flex:1;border-radius:10px;padding:10px;" disabled>
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;margin-right:6px;"><path d="M8 5v14l11-7z"/></svg>
+          Putar Semua
+        </button>
+        <button class="btn-secondary" id="playlist-shuffle-btn" style="flex:1;border-radius:10px;padding:10px;" disabled>
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;margin-right:6px;"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          Acak
+        </button>
+      </div>
+      <div class="playlist-tracks-sheet-body" id="playlist-tracks-body">
+        <div class="empty-state" style="padding:40px;">
+          <div class="spinner" style="border:3px solid rgba(255,255,255,0.1);border-top:3px solid var(--accent-color);border-radius:50%;width:28px;height:28px;animation:spin 1s linear infinite;margin:0 auto 10px;"></div>
+          <p>Memuat lagu dari playlist...</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close handlers
+  document.getElementById('playlist-modal-close-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+  // Load tracks
+  let loadedTracks = [];
+  loadPlaylistTracks(playlist.playlistId).then(rawTracks => {
+    loadedTracks = rawTracks.map(t => ({
+      id: `youtube_${t.videoId}`,
+      title: t.title,
+      artist: t.author || 'Artis YouTube',
+      album: playlist.title,
+      duration: t.lengthSeconds || 0,
+      coverUrl: `https://img.youtube.com/vi/${t.videoId}/hqdefault.jpg`,
+      audioUrl: '',
+      source: 'youtube',
+      videoId: t.videoId,
+      themeColor: '#ff0055'
+    }));
+
+    const body = document.getElementById('playlist-tracks-body');
+    if (!body) return;
+    body.innerHTML = '';
+
+    if (loadedTracks.length === 0) {
+      body.innerHTML = `<div class="empty-state" style="padding:30px;"><p>Tidak ada lagu yang dapat dimuat.</p></div>`;
+      return;
+    }
+
+    // Render track rows
+    loadedTracks.forEach((track, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 24px;cursor:pointer;transition:background 0.15s;border-radius:8px;';
+      row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.04)';
+      row.onmouseleave = () => row.style.background = '';
+      row.innerHTML = `
+        <span style="color:var(--text-muted);font-size:12px;width:24px;text-align:center;flex-shrink:0;">${idx + 1}</span>
+        <img src="https://img.youtube.com/vi/${track.videoId}/default.jpg" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0;" onerror="this.src='/default_cover.png'" />
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${track.title}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${track.artist}</div>
+        </div>
+        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${formatTime(track.duration)}</span>
+      `;
+      row.addEventListener('click', () => {
+        playTrack(track, loadedTracks);
+        modal.remove();
+      });
+      body.appendChild(row);
+    });
+
+    // Enable action buttons
+    const playAllBtn = document.getElementById('playlist-play-all-btn');
+    const shuffleBtn = document.getElementById('playlist-shuffle-btn');
+    if (playAllBtn) {
+      playAllBtn.disabled = false;
+      playAllBtn.addEventListener('click', () => {
+        playTrack(loadedTracks[0], loadedTracks);
+        modal.remove();
+        showToast(`Memutar playlist: ${playlist.title}`, 'success');
+      });
+    }
+    if (shuffleBtn) {
+      shuffleBtn.disabled = false;
+      shuffleBtn.addEventListener('click', () => {
+        const shuffled = [...loadedTracks].sort(() => Math.random() - 0.5);
+        playTrack(shuffled[0], shuffled);
+        modal.remove();
+        showToast(`Memutar acak: ${playlist.title}`, 'success');
+      });
+    }
+  }).catch(err => {
+    const body = document.getElementById('playlist-tracks-body');
+    if (body) body.innerHTML = `
+      <div class="empty-state" style="padding:30px;color:#ff3b30;">
+        <p>Gagal memuat lagu: ${err.message}</p>
       </div>
     `;
   });

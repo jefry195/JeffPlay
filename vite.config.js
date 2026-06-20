@@ -9,6 +9,83 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
           const urlObj = new URL(req.url, 'http://localhost');
+          if (urlObj.pathname === '/api/yt-playlist-search') {
+            const query = urlObj.searchParams.get('q');
+            if (!query) { res.statusCode = 400; res.end('Missing q'); return; }
+
+            import('child_process').then(({ execFile }) => {
+              import('path').then(({ default: path }) => {
+                const binPath = path.join(process.cwd(), 'bin', 'yt-dlp.exe');
+                // YouTube search with playlist filter: sp=EgIQAw%3D%3D
+                const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAw%3D%3D`;
+                execFile(binPath, [
+                  '--no-warnings', '-j', '--flat-playlist',
+                  '--playlist-end', '15',
+                  searchUrl
+                ], { maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
+                  if (err) {
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify([]));
+                    return;
+                  }
+                  const playlists = stdout.split('\n').filter(l => l.trim()).map(line => {
+                    try {
+                      const d = JSON.parse(line);
+                      const thumb = (d.thumbnails && d.thumbnails.length > 0)
+                        ? d.thumbnails[d.thumbnails.length - 1].url
+                        : `https://img.youtube.com/vi/${d.id}/hqdefault.jpg`;
+                      return {
+                        playlistId: d.id,
+                        title: d.title || 'Playlist',
+                        channel: d.uploader || d.channel || 'YouTube',
+                        videoCount: d.playlist_count || d.n_entries || null,
+                        thumbnailUrl: thumb
+                      };
+                    } catch { return null; }
+                  }).filter(Boolean);
+                  res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                  res.end(JSON.stringify(playlists));
+                });
+              });
+            });
+            return;
+          }
+
+          if (urlObj.pathname === '/api/yt-playlist') {
+            const playlistId = urlObj.searchParams.get('id');
+            if (!playlistId) { res.statusCode = 400; res.end('Missing id'); return; }
+
+            import('child_process').then(({ execFile }) => {
+              import('path').then(({ default: path }) => {
+                const binPath = path.join(process.cwd(), 'bin', 'yt-dlp.exe');
+                const playlistUrl = `https://www.youtube.com/playlist?list=${playlistId}`;
+                execFile(binPath, [
+                  '--no-warnings', '-j', '--flat-playlist', playlistUrl
+                ], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+                  if (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify({ error: err.message }));
+                    return;
+                  }
+                  const tracks = stdout.split('\n').filter(l => l.trim()).map(line => {
+                    try {
+                      const d = JSON.parse(line);
+                      return {
+                        videoId: d.id,
+                        title: d.title || 'Video',
+                        author: d.uploader || d.channel || 'YouTube',
+                        lengthSeconds: Math.round(d.duration || 0)
+                      };
+                    } catch { return null; }
+                  }).filter(Boolean);
+                  res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                  res.end(JSON.stringify(tracks));
+                });
+              });
+            });
+            return;
+          }
+
           if (urlObj.pathname === '/api/yt-search') {
             const query = urlObj.searchParams.get('q');
             const pageStr = urlObj.searchParams.get('page') || '1';
